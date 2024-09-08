@@ -7,6 +7,12 @@ import (
 	"os"
 )
 
+// Define an application struct to hold the application-wide dependencies for the
+// web application.
+type application struct {
+	logger *slog.Logger
+}
+
 func main() {
 	// Define a new command-line flag with the name 'addr', a default value of ":4000"
 	// and some short help text explaining what the flag controls. The value of the flag
@@ -17,6 +23,12 @@ func main() {
 	// Use the slog.New() function to initialise a new structured logger, which
 	// writes to the standard out stream and used the default settings.
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	// Initialize a new instance of our application struct, containing the
+	// dependencies (for now, just the structured logger).
+	app := &application{
+		logger: logger,
+	}
 
 	mux := http.NewServeMux()
 
@@ -31,10 +43,10 @@ func main() {
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileserver))
 
 	// Register the other application routes as normal...
-	mux.HandleFunc("GET /{$}", home)                      // Restrict this route to exact matches only
-	mux.HandleFunc("GET /snippet/view/{id}", snippetView) // add the {id} wildcard
-	mux.HandleFunc("GET /snippet/create", snippetCreate)
-	mux.HandleFunc("POST /snippet/create", snippetCreatePost)
+	mux.HandleFunc("GET /{$}", app.home)                      // Restrict this route to exact matches only
+	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView) // add the {id} wildcard
+	mux.HandleFunc("GET /snippet/create", app.snippetCreate)
+	mux.HandleFunc("POST /snippet/create", app.snippetCreatePost)
 
 	// The value returned from the flag.String() function is a pointer to a the flag
 	// value itself, so needs to be de-referenced before using it.
