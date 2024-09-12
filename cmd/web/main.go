@@ -1,66 +1,68 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"log/slog"
 	"net/http"
 	"os"
+
+	_ "github.com/go-sql-driver/mysql"
+	"snippetbox.example.com/internal/models"
 )
 
 // Define an application struct to hold the application-wide dependencies for the
 // web application.
+// Holds an slog logger dependency
+// Hold a models snippetmodel dependency
 type application struct {
-	logger *slog.Logger
+	logger   *slog.Logger
+	snippets *models.SnippetModel
 }
 
 func main() {
-	// Define a new command-line flag with the name 'addr', a default value of ":4000"
-	// and some short help text explaining what the flag controls. The value of the flag
-	// will be stored in the addr variable at runtime.
 	addr := flag.String("addr", ":4000", "HTTP network address")
+	dsn := flag.String("dsn", "web:w3bpassword@/snippetbox?parseTime=true", "MySQL data source name")
+
 	flag.Parse()
 
-	// Use the slog.New() function to initialise a new structured logger, which
-	// writes to the standard out stream and used the default settings.
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Initialize a new instance of our application struct, containing the
-	// dependencies (for now, just the structured logger).
-	app := &application{
-		logger: logger,
+	// To keep the main() function tidy we will use a separate openDB() function
+	db, err := openDB(*dsn)
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
 	}
 
-	mux := http.NewServeMux()
+	defer db.Close()
 
-	// Create a fileserver which serves files out of the "./ui/static" directory
-	// Note that the path given to the http.Dir function is relative to the project
-	// directory root.
-	fileserver := http.FileServer(http.Dir("./ui/static"))
+	app := &application{
+		logger:   logger,
+		snippets: &models.SnippetModel{DB: db},
+	}
 
-	// USe the mux.Handle() function to register the file server as the handler for
-	// all URL paths that start with "/static/".  For matching paths, we strip the
-	// "/static/" prefeix before the request reaches the file server.
-	mux.Handle("GET /static/", http.StripPrefix("/static", fileserver))
-
-	// Register the other application routes as normal...
-	mux.HandleFunc("GET /{$}", app.home)                      // Restrict this route to exact matches only
-	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView) // add the {id} wildcard
-	mux.HandleFunc("GET /snippet/create", app.snippetCreate)
-	mux.HandleFunc("POST /snippet/create", app.snippetCreatePost)
-
-	// The value returned from the flag.String() function is a pointer to a the flag
-	// value itself, so needs to be de-referenced before using it.
-
-	// Use the Info() method to log the server start message
 	logger.Info("starting server", "addr", *addr)
 
-	err := http.ListenAndServe(*addr, mux)
-
-	// And we can use the Error() method to log any error message returned by
-	// ListenAndServe() at Error severity and then call os.Exit(1) to exit with
-	// exit code (1).
+	// Call the new app.Routes() method to the servemux containing our routes,
+	// and pass that to http.ListenAndServe().
+	err = http.ListenAndServe(*addr, app.routes())
 	logger.Error(err.Error())
 	os.Exit(1)
-	// Note: There is not slog equivalent to the log.Fatal() function so we have to
-	// write the Error and then close the application with os.Exit().
+}
+
+// The openDB function wraps sql.Open and returns a sql.DB connection pool
+// for a given DSN.
+func openDB(dsn string) (*sql.DB, error) {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Ping()
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
 }
