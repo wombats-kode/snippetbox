@@ -14,6 +14,7 @@ type templateData struct {
 	CurrentYear int
 	Snippet     models.Snippet
 	Snippets    []models.Snippet
+	Form        any
 }
 
 // Function that returns a nicely formatted string representation of
