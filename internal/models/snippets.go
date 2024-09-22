@@ -26,7 +26,7 @@ func (m *SnippetModel) Insert(title string, content string, expires int) (int, e
 	// for readability (which is why it's surrounded with backquotes instead
 	// of normal double quotes).
 	stmt := `INSERT INTO snippets (title, content, created, expires)
-			VALUES(?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), c ? DAY))`
+			VALUES(?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))`
 
 	// Use the Exec() method on the embedded connection pool to execute the
 	// statement. The first parameter is the SQL statement, followed by the

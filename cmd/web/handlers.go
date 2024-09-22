@@ -50,14 +50,35 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Display a form for creating a new snippet..."))
+	data := app.newTemplateData(r)
+
+	app.render(w, r, http.StatusOK, "create.tmpl", data)
 }
 
 func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request) {
-	//Create dummy data to test our SQL model, remove later.
-	title := "O snail"
-	content := "O snail\nClimb Mount Fuji,\nBut slowly, slowly!\n\n-Kobayashi Issa"
-	expires := 7
+	// First we call r.ParseForm() which adds any data in POST request bodies
+	// to the r.PostForm map.  This also works in the same way for PUT and PATCH
+	// requests.  If there are any errors we use our app.ClientError() helper to
+	// send a 400 Bad Request response to the user.
+	err := r.ParseForm()
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	// Use the r.Postform.Get() method to retrieve the title and content
+	// from the r.PostForm map.
+	title := r.PostForm.Get("title")
+	content := r.PostForm.Get("content")
+
+	// The r.PostForm.Get() method always returns the data as a *string* so we need
+	// to manually convert are data to the correct types.  We send a 400 Bad Request
+	// if the conversion fails.
+	expires, err := strconv.Atoi(r.PostForm.Get("expires"))
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
 
 	// Pass the data to the SnippetModel.Insert() method, returning the ID of the new record
 	id, err := app.snippets.Insert(title, content, expires)
