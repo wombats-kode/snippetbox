@@ -64,59 +64,27 @@ func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "create.tmpl", data)
 }
 
-// Define a snippetCreateForm struct to represent the form data and validation
-// errors for the form fields. Note that all the struct fields are deliberately
-// exported (i.e. start with a capital letter). This is because struct fields
-// must be exported in order to be read by the html/template package when
-// rendering the template.
-
-// Remove the explicit FieldErrors struct field and instead embed the Validator
-// struct. Embedding this means that our snippetCreateForm "inherits" all the
-// fields and methods of our Validator struct (including the FieldErrors field).
+// Update our snippetCreateForm struct to include struct tags which tell the
+// decoder how to map HTML form values into the different struct fields. So, for
+// example, here we're telling the decoder to store the value from the HTML form
+// input with the name "title" in the Title field. The struct tag `form:"-"`
+// tells the decoder to completely ignore a field during decoding.
 type snippetCreateForm struct {
-	Title   string
-	Content string
-	Expires int
-	validator.Validator
+	Title               string `form:"title"`
+	Content             string `form:"content"`
+	Expires             int    `form:"expires"`
+	validator.Validator `form:"expires"`
 }
 
 func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request) {
-	// First we call r.ParseForm() which adds any data in POST request bodies
-	// to the r.PostForm map.  This also works in the same way for PUT and PATCH
-	// requests.  If there are any errors we use our app.ClientError() helper to
-	// send a 400 Bad Request response to the user.
-	err := r.ParseForm()
+	var form snippetCreateForm
+
+	err := app.decodePostForm(r, &form)
 	if err != nil {
-		fmt.Println("something weird happened at ParseForm")
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 
-	// The r.PostForm.Get() method always returns the data as a *string* so we need
-	// to manually convert are data to the correct types.  We send a 400 Bad Request
-	// if the conversion fails.
-	expires, err := strconv.Atoi(r.PostForm.Get("expires"))
-	if err != nil {
-		fmt.Println("something weird happened at Bob")
-		app.clientError(w, http.StatusBadRequest)
-		return
-	}
-
-	// Create an instance of the snippetCreateForm struct containing the value
-	// from the form and an empty map for validation errors.
-	form := snippetCreateForm{
-		Title:   r.PostForm.Get("title"),
-		Content: r.PostForm.Get("content"),
-		Expires: expires,
-	}
-
-	// Because the Validator struct is embedded by the snippetCreateForm struct,
-	// we can call CheckField() directly on it to execute our validation checks.
-	// CheckField() will add the provided key and error message to the
-	// FieldErrors map if the check does not evaluate to true. For example, in
-	// the first line here we "check that the form.Title field is not blank". In
-	// the second, we "check that the form.Title field has a maximum character
-	// length of 100" and so on.
 	form.CheckField(validator.NotBlank(form.Title), "title", "This field cannot be blank")
 	form.CheckField(validator.MaxChars(form.Title, 100), "title", "This field cannot be more than 100 characters long")
 	form.CheckField(validator.NotBlank(form.Content), "content", "This field cannot be blank")
