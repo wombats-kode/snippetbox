@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"html/template"
@@ -57,6 +58,7 @@ func main() {
 	sessionManager := scs.New()
 	sessionManager.Store = mysqlstore.New(db)
 	sessionManager.Lifetime = 12 * time.Hour
+	sessionManager.Cookie.Secure = true
 
 	app := &application{
 		logger:         logger,
@@ -65,12 +67,28 @@ func main() {
 		formDecoder:    form.NewDecoder(),
 		sessionManager: sessionManager,
 	}
+	// Initialise a tls.Config struct to hold the non-default TLS settings we
+	// want the server to make.
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	}
+	// Initialise a new http.Server struct. We set the Addr and Handler field so
+	// that the server uses the same network address and routes as before.
+	srv := &http.Server{
+		Addr:         *addr,
+		Handler:      app.routes(),
+		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		TLSConfig:    tlsConfig,
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
 
 	logger.Info("starting server", "addr", *addr)
 
-	// Call the new app.Routes() method to the servemux containing our routes,
-	// and pass that to http.ListenAndServe().
-	err = http.ListenAndServe(*addr, app.routes())
+	// Call the ListenAndServe() method on our new http.Server struct to start
+	// the server.
+	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
 	logger.Error(err.Error())
 	os.Exit(1)
 }
