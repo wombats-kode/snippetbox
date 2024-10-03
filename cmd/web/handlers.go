@@ -42,7 +42,8 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-
+	// added code to helper function to automatically load "flash" banner when
+	// templateData is initially created.
 	data := app.newTemplateData(r)
 	data.Snippet = snippet
 
@@ -104,6 +105,8 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		app.serverError(w, r, err)
 		return
 	}
+	// Use the Put() method to add a string value and corresponding key to the session data.
+	app.sessionManager.Put(r.Context(), "flash", "Snippet successfully created!")
 
 	// Redirect the user to the relevant page for the snippet.
 	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther)
