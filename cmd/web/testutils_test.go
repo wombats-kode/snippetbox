@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
 
@@ -14,6 +16,22 @@ import (
 	"github.com/go-playground/form/v4"
 	"snippetbox.example.com/internal/models/mocks"
 )
+
+// Define a regular expression which captures the CSRF token value from the
+// HTML for our user signup page.
+var csrfTokenRX = regexp.MustCompile(`<input type='hidden' name='csrf_token' value='(.+)'>`)
+
+func extractCSRFToken(t *testing.T, body string) string {
+	// Use the FindStringSubmatch method to extract the token from the HTML body.
+	// Note that this returns an array with the entire matched pattern in the
+	// first position, and the values of any captured data in the subsequent
+	// positions.
+	matches := csrfTokenRX.FindStringSubmatch(body)
+	if len(matches) < 2 {
+		t.Fatal("no csrf token found in body")
+	}
+	return html.UnescapeString(matches[1])
+}
 
 // Create a newTestApplication helper which returns an instance of our
 // application struct containing mocked dependencies.
